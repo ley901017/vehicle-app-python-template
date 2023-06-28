@@ -181,6 +181,37 @@
 				"close": false
 			},
 			"problemMatcher": []
+		},
+		{
+			"label": "Kanto Runtime - Build VehicleApp",
+			"detail": "Builds the VehicleApp and pushes it to the local registry.",
+			"type": "shell",
+			"command": "velocitas exec deployment-kanto build-vehicleapp",
+			"group": "none",
+			"presentation": {
+				"reveal": "always",
+				"panel": "dedicated",
+				"clear": true,
+				"close": false
+			},
+			"problemMatcher": []
+		},
+		{
+			"label": "Kanto Runtime - Deploy VehicleApp",
+			"detail": "Builds and deploys the VehicleApp via Kanto-cm",
+			"type": "shell",
+			"command": "velocitas exec deployment-kanto deploy-vehicleapp",
+			"group": "none",
+			"presentation": {
+				"reveal": "always",
+				"panel": "dedicated",
+				"clear": true,
+				"close": false
+			},
+			"dependsOn": [
+				"Kanto Runtime - Build VehicleApp"
+			],
+			"problemMatcher": []
 		}
 	],
 	"inputs": [
