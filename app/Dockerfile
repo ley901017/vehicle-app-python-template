@@ -17,6 +17,11 @@
 # Build stage, to create the executable
 FROM --platform=$TARGETPLATFORM python:3.10-slim-bullseye@sha256:1ee6094f44c67781fa9533a4215f44f80dd3f43a68751ad2c855712116c03b05 as builder
 
+RUN sed -i "s@http://\(deb\|security\).debian.org@https://mirrors.aliyun.com@g" /etc/apt/sources.list
+
+RUN pip3 config set global.index-url http://mirrors.aliyun.com/pypi/simple/
+RUN pip3 config set install.trusted-host mirrors.aliyun.com
+
 RUN apt-get update && apt-get install -y binutils
 
 COPY ./app /app
@@ -57,6 +62,6 @@ WORKDIR /dist
 
 ENV PATH="/dist:$PATH"
 
-LABEL org.opencontainers.image.source="https://github.com/eclipse-velocitas/vehicle-app-python-template"
+LABEL org.opencontainers.image.source="https://github.com/ley901017/vehicle-app-python-template"
 
 CMD ["./run-exe"]
