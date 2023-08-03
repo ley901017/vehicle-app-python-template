@@ -37,6 +37,47 @@ GET_SPEED_REQUEST_TOPIC = "sampleapp/getSpeed"
 GET_SPEED_RESPONSE_TOPIC = "sampleapp/getSpeed/response"
 DATABROKER_SUBSCRIPTION_TOPIC = "sampleapp/currentSpeed"
 
+VOICE_CONTROL_REQUEST_TOPIC = "tw_mcu/sdvos_voice_ctrl"
+VOICE_CONTROL_RESPONSE_TOPICE = "tw_mcu/sdvos_voice_ctrl/response"
+
+# Voice command definition
+SDVOS_SEAT_MOVE_FORWARD = 0
+SDVOS_SEAT_MOVE_BACKWARD = 1
+SDVOS_FAN_START = 2
+SDVOS_FAN_STOP = 3
+SDVOS_MIRRORREAR_PAN_LEFT = 4
+SDVOS_MIRRORREAR_PAN_RIGHT = 5
+SDVOS_MIRRORREAR_TITL_UP = 6
+SDVOS_MIRRORREAR_TITL_DOWN = 7
+SDVOS_LUMBAR_SUPPORT_START = 8
+SDVOS_LUMBAR_SUPPORT_DEFLATION = 9
+
+# Seat position base value, max value, min value and move step
+VSS_SEAT_POSITION_BASE = 50
+VSS_SEAT_POSITION_MAX = 60
+VSS_SEAT_POSITION_MIN = 40
+VSS_SEAT_POSITION_MOVE_STEP = 10
+
+# Fan
+VSS_FAN_START = 45
+VSS_FAN_STOP = 0
+
+# Mirror
+VSS_MIRROR_PAN_LEFT = 120
+VSS_MIRROR_PAN_RIGHT = 121
+VSS_MIRROR_TILT_UP = 122
+VSS_MIRROR_TILT_DOWN = 123
+VSS_MIRROR_MOVE_STOP = 118
+
+# Air Cell
+VSS_LUMBAR_AIRCELL0 = 124
+VSS_LUMBAR_AIRCELL1 = 125
+VSS_LUMBAR_AIRCELL_STOP = 126
+VSS_LUMBAR_AIRCELL_DEFLATION = 127
+
+# Current Seat Postion
+seat_position_current = VSS_SEAT_POSITION_BASE
+
 
 class SampleApp(VehicleApp):
     """
@@ -63,7 +104,8 @@ class SampleApp(VehicleApp):
         # This method will be called by the SDK when the connection to the
         # Vehicle DataBroker is ready.
         # Here you can subscribe for the Vehicle Signals update (e.g. Vehicle Speed).
-        await self.Vehicle.Speed.subscribe(self.on_speed_change)
+        # await self.Vehicle.Speed.subscribe(self.on_speed_change)
+        pass
 
     async def on_speed_change(self, data: DataPointReply):
         """The on_speed_change callback, this will be executed when receiving a new
@@ -80,6 +122,93 @@ class SampleApp(VehicleApp):
             DATABROKER_SUBSCRIPTION_TOPIC,
             json.dumps({"speed": vehicle_speed}),
         )
+
+    async def send_mqtt_response(self, msg: str):
+        await self.publish_mqtt_event(
+            VOICE_CONTROL_RESPONSE_TOPICE,
+            json.dumps(
+                {
+                    "result": {
+                        "status": 1,
+                        "message": msg,
+                    },
+                }
+            ),
+        )
+
+    @subscribe_topic(VOICE_CONTROL_REQUEST_TOPIC)
+    async def on_voice_control_request_received(self, data: str):
+        logger.debug(
+            "PubSub event for the Topic: %s -> is received with the data: %s",
+            VOICE_CONTROL_REQUEST_TOPIC,
+            data,
+        )
+
+        voice_data = json.loads(data)
+        voice_cmd = voice_data.get('voice_cmd')
+        global seat_position_current
+
+        if SDVOS_SEAT_MOVE_FORWARD == voice_cmd:
+            positon = seat_position_current + VSS_SEAT_POSITION_MOVE_STEP
+            if seat_position_current >= VSS_SEAT_POSITION_MAX:
+                await self.send_mqtt_response("The Seat Position will"
+                                              "be bigger than max value(60).")
+            else:
+                await self.Vehicle.Cabin.Seat.Row1.Pos1.Position.set(positon)
+                seat_position_current = positon
+                logger.debug(f"The current seat position is {seat_position_current}")
+
+        if SDVOS_SEAT_MOVE_BACKWARD == voice_cmd:
+            positon = seat_position_current - VSS_SEAT_POSITION_MOVE_STEP
+            if seat_position_current <= VSS_SEAT_POSITION_MIN:
+                await self.send_mqtt_response("The Seat Position will"
+                                              "be litter than min value(40).")
+            else:
+                await self.Vehicle.Cabin.Seat.Row1.Pos1.Position.set(positon)
+                seat_position_current = positon
+                logger.debug(f"The current seat position is {seat_position_current}")
+
+        if SDVOS_FAN_START == voice_cmd:
+            await self.Vehicle.Cabin.HVAC.Station.Row1.Left.FanSpeed.set(VSS_FAN_START)
+            logger.debug(f"Fan is enabled as {VSS_FAN_START}")
+
+        if SDVOS_FAN_STOP == voice_cmd:
+            await self.Vehicle.Cabin.HVAC.Station.Row1.Left.FanSpeed.set(VSS_FAN_STOP)
+            logger.debug("Fan is disabled.")
+
+        if SDVOS_MIRRORREAR_PAN_LEFT == voice_cmd:
+            logger.debug("Mirror pan left.")
+            await self.Vehicle.Body.Mirrors.Left.Pan.set(VSS_MIRROR_PAN_LEFT)
+            await asyncio.sleep(2)
+            await self.Vehicle.Body.Mirrors.Left.Pan.set(VSS_MIRROR_MOVE_STOP)
+
+        if SDVOS_MIRRORREAR_PAN_RIGHT == voice_cmd:
+            logger.debug("Mirror pan right.")
+            await self.Vehicle.Body.Mirrors.Left.Pan.set(VSS_MIRROR_PAN_RIGHT)
+            await asyncio.sleep(2)
+            await self.Vehicle.Body.Mirrors.Left.Pan.set(VSS_MIRROR_MOVE_STOP)
+
+        if SDVOS_MIRRORREAR_TITL_UP == voice_cmd:
+            logger.debug("Mirror tilt up.")
+            await self.Vehicle.Body.Mirrors.Left.Pan.set(VSS_MIRROR_TILT_UP)
+            await asyncio.sleep(2)
+            await self.Vehicle.Body.Mirrors.Left.Pan.set(VSS_MIRROR_MOVE_STOP)
+
+        if SDVOS_MIRRORREAR_TITL_DOWN == voice_cmd:
+            logger.debug("Mirror tilt down.")
+            await self.Vehicle.Body.Mirrors.Left.Pan.set(VSS_MIRROR_TILT_DOWN)
+            await asyncio.sleep(2)
+            await self.Vehicle.Body.Mirrors.Left.Pan.set(VSS_MIRROR_MOVE_STOP)
+
+        if SDVOS_LUMBAR_SUPPORT_START == voice_cmd:
+            logger.debug("Air cell start.")
+            await self.Vehicle.Cabin.Seat.Row1.Pos1.Backrest.Lumbar.Support.set(VSS_LUMBAR_AIRCELL0)
+            await self.Vehicle.Cabin.Seat.Row1.Pos1.Backrest.Lumbar.Support.set(VSS_LUMBAR_AIRCELL1)
+            await asyncio.sleep(2)
+            await self.Vehicle.Cabin.Seat.Row1.Pos1.Backrest.Lumbar.Support.set(VSS_LUMBAR_AIRCELL_STOP)
+        if SDVOS_LUMBAR_SUPPORT_DEFLATION == voice_cmd:
+            logger.debug("Air cell deflation.")
+            await self.Vehicle.Cabin.Seat.Row1.Pos1.Backrest.Lumbar.Support.set(VSS_LUMBAR_AIRCELL_DEFLATION)
 
     @subscribe_topic(GET_SPEED_REQUEST_TOPIC)
     async def on_get_speed_request_received(self, data: str) -> None:
